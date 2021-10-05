@@ -1,3 +1,11 @@
+## Introduction
+
+This folder contains code & data for a surrogate-based Trojan reverse engineering method for [TrojAI challenge](https://pages.nist.gov/trojai/) round 8 Question Answering, which achieved CE 0.5749 and ROC-AUC 0.7593. 
+
+Surrogate-based Trojan reverse engineering addresses the challenge of reverse engineering Trojan triggers within a limited number of interences of the original transformer. A fast surrogate model which takes a trigger phrase as input and predict its label flipping loss is learned to mimic the original transformer. Triggers that achieve low loss on the surrogate model are iteratively selected to query the original transformer and the query result is used for updating the surrogate model. 
+
+To improve the accuracy of the surrogate model under few updates, we use meta-learning to learn a trigger embedding function which, under linear regression, mimics the original transformer well.
+
 ## Prerequisite
 
 Extract TrojAI round 8 models into `data/round8-train-dataset/models`. METADATA.csv at `data/round8-train-dataset/METADATA.csv`.
@@ -44,3 +52,16 @@ After feature extraction, use `python crossval_hyper.py --data data_r8_surrogate
 
 `build.sh` has a testing script for building and testing the singularity container.
 
+### References
+
+If you use our dataset as part of published research, please cite:
+
+```
+@misc{Lin2021,
+author = {Xiao Lin and Michael Cogswell and Meng Ye and Ajay Divakaran and Susmit Jha and Yi Yao},
+title = {Surrogate-based Reverse Engineering for Trojan Detection},
+year = {2021},
+publisher = {GitHub},
+journal = {GitHub repository},
+howpublished = {\url{https://github.com/frkl/Trinity-TrojAI/tree/trojai-r8/TriggerSearch}},
+}```
