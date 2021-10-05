@@ -2,7 +2,7 @@
 
 This folder contains code & data for a surrogate-based Trojan reverse engineering method for [TrojAI challenge](https://pages.nist.gov/trojai/) round 8 Question Answering, which achieved CE 0.5749 and ROC-AUC 0.7593. 
 
-Surrogate-based Trojan reverse engineering addresses the challenge of reverse engineering Trojan triggers within a limited number of interences of the original transformer. A fast surrogate model which takes a trigger phrase as input and predict its label flipping loss is learned to mimic the original transformer. Triggers that achieve low loss on the surrogate model are iteratively selected to query the original transformer and the query result is used for updating the surrogate model. 
+Surrogate-based Trojan reverse engineering addresses the challenge of reverse engineering Trojan triggers within a limited number of inferences to the original transformer. A fast surrogate model which takes a trigger phrase as input and predict its label flipping loss is learned to mimic the original transformer. Triggers that achieve low loss on the surrogate model are iteratively selected to query the original transformer and the query result is used for updating the surrogate model. 
 
 To improve the accuracy of the surrogate model under few updates, we use meta-learning to learn a trigger embedding function which, under linear regression, mimics the original transformer well.
 
