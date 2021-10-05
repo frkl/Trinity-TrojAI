@@ -32,7 +32,6 @@ import torchvision.transforms as Ts
 import PIL.Image as Image
 
 import torch.utils.data.dataloader as myDataLoader
-import skimage.io
 
 import util.db as db
 import util.smartparse as smartparse
@@ -48,19 +47,10 @@ def default_params():
     params=smartparse.obj();
     #Data
     params.nsplits=8;
-    params.pct=0.8
+    params.pct=0.5
     #Model
-    params.arch='arch.mlpv2';
-    params.nh=256;
-    params.nlayers=3;
-    
-    #Optimization
-    params.batch=256;
-    params.lr=1e-3;
-    params.epochs=300;
-    params.decay=1e-4;
-    
-    
+    params.arch='arch.mlp_eig';
+    params.data='data_r8_eig.pt';
     #MISC
     params.session_dir=None;
     params.budget=10000;
@@ -81,9 +71,23 @@ params = smartparse.parse()
 params = smartparse.merge(params, default_params())
 params.argv=sys.argv;
 
-data=dataloader.new('data_r3v3.pt');
+data=dataloader.new(params.data);
 data.cuda();
 params.stuff=data.preprocess();
+
+import util.db as db
+import pandas
+meta=pandas.read_csv('data/round8-train-dataset/METADATA.csv');
+meta_table={};
+meta_table['model_name']=list(meta['model_name']);
+meta_table['model_architecture']=list(meta['model_architecture']);
+meta_table['source_dataset']=list(meta['source_dataset']);
+meta_table['trigger_option']=list(meta['trigger_option']);
+meta_table['trigger_type']=list(meta['trigger_type']);
+meta_table=db.Table(meta_table)
+assert 'model_name' in data.data['table_ann'].d.keys()
+
+data.data['table_ann']=db.left_join(data.data['table_ann'],meta_table,'model_name');
 
 
 session=create_session(params);
@@ -94,47 +98,52 @@ hp_config=[];
 
 #   Architectures
 #archs=['arch.mlpv2','arch.mlpv3','arch.mlpv4','arch.mlpv5','arch.mlpv6'];
-archs=['arch.mlp_set_color_v2xy'];
+archs=[params.arch];
 
 hp_config.append(hp.choice('arch',archs));
-hp_config.append(hp.qloguniform('nh',low=math.log(16),high=math.log(384),q=4));
-hp_config.append(hp.qloguniform('nh2',low=math.log(16),high=math.log(384),q=4));
-hp_config.append(hp.quniform('nlayers',low=1,high=10,q=1));
-hp_config.append(hp.quniform('nlayers2',low=1,high=10,q=1));
-hp_config.append(hp.quniform('nlayers3',low=1,high=10,q=1));
+hp_config.append(hp.qloguniform('nh',low=math.log(16),high=math.log(512),q=1));
+hp_config.append(hp.qloguniform('nh2',low=math.log(16),high=math.log(512),q=1));
+hp_config.append(hp.qloguniform('nh3',low=math.log(16),high=math.log(512),q=1));
+hp_config.append(hp.quniform('nlayers',low=1,high=12,q=1));
+hp_config.append(hp.quniform('nlayers2',low=1,high=12,q=1));
+hp_config.append(hp.quniform('nlayers3',low=1,high=12,q=1));
+hp_config.append(hp.loguniform('margin',low=math.log(2),high=math.log(1e1)));
 #   OPT
-hp_config.append(hp.qloguniform('epochs',low=math.log(5),high=math.log(200),q=1));
-hp_config.append(hp.loguniform('lr',low=math.log(1e-4),high=math.log(5e-2)));
-hp_config.append(hp.loguniform('decay',low=math.log(1e-6),high=math.log(1e-3)));
+hp_config.append(hp.qloguniform('epochs',low=math.log(10),high=math.log(500),q=1));
+hp_config.append(hp.loguniform('lr',low=math.log(1e-6),high=math.log(1e-2)));
+hp_config.append(hp.loguniform('decay',low=math.log(1e-8),high=math.log(1e-3)));
 hp_config.append(hp.qloguniform('batch',low=math.log(16),high=math.log(64),q=1));
 
 #Function to compute performance
-def configure_pipeline(params,arch,nh,nh2,nlayers,nlayers2,nlayers3,epochs,lr,decay,batch):
+def configure_pipeline(params,arch,nh,nh2,nh3,nlayers,nlayers2,nlayers3,margin,epochs,lr,decay,batch):
     params_=smartparse.obj();
     params_.arch=arch;
     params_.nh=int(nh);
     params_.nh2=int(nh2);
+    params_.nh3=int(nh3);
     params_.nlayers=int(nlayers);
     params_.nlayers2=int(nlayers2);
     params_.nlayers3=int(nlayers3);
-    params_.epochs=epochs;
+    params_.margin=margin;
+    params_.epochs=int(epochs);
     params_.lr=lr;
-    params_.batch=batch;
+    params_.decay=decay;
+    params_.batch=int(batch);
     params_=smartparse.merge(params_,params);
     return params_;
 
 crossval_splits=[];
 for i in range(params.nsplits):
     data_train,data_test=data.generate_random_crossval_split(pct=params.pct);
-    data_train,data_val=data_train.generate_random_crossval_split();
-    crossval_splits.append((data_train,data_val,data_test));
+    #data_val,data_test=data_test.generate_random_crossval_split(pct=0.5);
+    crossval_splits.append((data_train,data_test,data_test));
 
-best_loss_so_far=-1e10;
+best_loss_so_far=1e10;
 def run_crossval(p):
     global best_loss_so_far
     max_batch=16;
-    arch,nh,nh2,nlayers,nlayers2,nlayers3,epochs,lr,decay,batch=p;
-    params_=configure_pipeline(params,arch,nh,nh2,nlayers,nlayers2,nlayers3,epochs,lr,decay,batch);
+    arch,nh,nh2,nh3,nlayers,nlayers2,nlayers3,margin,epochs,lr,decay,batch=p;
+    params_=configure_pipeline(params,arch,nh,nh2,nh3,nlayers,nlayers2,nlayers3,margin,epochs,lr,decay,batch);
     arch_=importlib.import_module(params_.arch);
     #Random splits N times
     auc=[];
@@ -149,13 +158,14 @@ def run_crossval(p):
         opt=optim.Adam(net.parameters(),lr=params_.lr); #params_.lr
         
         #Train loop
-        best_loss=-1e10;
+        best_loss=1e10;
         best_net=copy.deepcopy(net);
         
+        #Training
         for iter in range(params_.epochs):
             net.train();
             loss_total=[];
-            for data_batch in data_train.batches(params_.batch,shuffle=True):
+            for data_batch in data_train.batches(params_.batch,shuffle=True,full=True):
                 opt.zero_grad();
                 net.zero_grad();
                 data_batch.cuda();
@@ -188,7 +198,7 @@ def run_crossval(p):
             #    
             #    C=data_batch['label'];
             #    data_batch.delete_column('label');
-            #    scores_i=net(data_batch);
+            #    scores_i=net.logp(data_batch);
             #    scores.append(scores_i.data.cpu());
             #    gt.append(C.data.cpu());
             
@@ -197,11 +207,13 @@ def run_crossval(p):
             
             #auc_i=sklearn.metrics.roc_auc_score(gt.numpy(),scores.numpy());
             #loss_i=float(F.binary_cross_entropy_with_logits(scores,gt.float()));
-            #if best_loss<auc_i:
-            #    best_loss=auc_i;
+            #if best_loss>loss_i:
+            #    best_loss=loss_i;
             #    best_net=copy.deepcopy(net);
             
             #print('train %.4f, loss %.4f, auc %.4f'%(float(loss_total),float(loss_i),float(auc_i)))
+            #for g in opt.param_groups:
+            #    g['lr'] = g['lr']*0.98
         
         #Temperature-scaling calibration on val
         #net=best_net;
@@ -254,10 +266,10 @@ def run_crossval(p):
         def compute_metrics(scores,gt,keys=None):
             if not keys is None:
                 #slicing
-                categories=set([k for k in keys if not k is None]);
+                categories=set([k for k in keys if not (k is None or k=='None')]);
                 results={};
                 for c in categories:
-                    ind=[i for i,k in enumerate(keys) if k==c or k is None];
+                    ind=[i for i,k in enumerate(keys) if k==c or (k is None or k=='None')];
                     scores_c=[scores[i] for i in ind];
                     gt_c=[gt[i] for i in ind];
                     auc_c,ce_c=compute_metrics(scores_c,gt_c);
@@ -272,37 +284,14 @@ def run_crossval(p):
         
         auc_i,ce_i=compute_metrics(scores.tolist(),gt.tolist());
         _,ce_pre_i=compute_metrics(scores_pre.tolist(),gt.tolist());
-        results_i=compute_metrics(scores.tolist(),gt.tolist(),data_test.data['table_ann']['nclasses'])
-        for k in results_i:
-            if k in results_by_key:
+        
+        for result_key in ['model_architecture','source_dataset','trigger_option','trigger_type']:
+            results_i=compute_metrics(scores.tolist(),gt.tolist(),data_test.data['table_ann'][result_key])
+            for k in results_i:
+                if not k in results_by_key:
+                    results_by_key[k]={'auc':[],'ce':[]};
                 results_by_key[k]['auc'].append(results_i[k]['auc'])
                 results_by_key[k]['ce'].append(results_i[k]['ce']);
-            else:
-                results_by_key[k]={'auc':[],'ce':[]};
-        
-        #results_i=compute_metrics(scores.tolist(),gt.tolist(),data_test.data['table_ann']['arch'])
-        #for k in results_i:
-        #    if k in results_by_key:
-        #        results_by_key[k]['auc'].append(results_i[k]['auc'])
-        #        results_by_key[k]['ce'].append(results_i[k]['ce']);
-        #    else:
-        #        results_by_key[k]={'auc':[],'ce':[]};
-        
-        results_i=compute_metrics(scores.tolist(),gt.tolist(),data_test.data['table_ann']['trigger'])
-        for k in results_i:
-            if k in results_by_key:
-                results_by_key[k]['auc'].append(results_i[k]['auc'])
-                results_by_key[k]['ce'].append(results_i[k]['ce']);
-            else:
-                results_by_key[k]={'auc':[],'ce':[]};
-        
-        results_i=compute_metrics(scores.tolist(),gt.tolist(),data_test.data['table_ann']['trigger_subtype'])
-        for k in results_i:
-            if k in results_by_key:
-                results_by_key[k]['auc'].append(results_i[k]['auc'])
-                results_by_key[k]['ce'].append(results_i[k]['ce']);
-            else:
-                results_by_key[k]={'auc':[],'ce':[]};
         
         auc.append(auc_i);
         ce.append(ce_i);
@@ -310,19 +299,20 @@ def run_crossval(p):
         session.log('Split %d, loss %.4f (%.4f), auc %.4f, time %f'%(split_id,ce_i,ce_pre_i,auc_i,time.time()-t0));
         
         ensemble.append({'net':net.cpu().state_dict(),'params':params_,'T':float(T.data.cpu())})
-        
+    
     
     auc=torch.Tensor(auc);
     ce=torch.Tensor(ce);
     cepre=torch.Tensor(cepre);
     
-    if float(auc.mean())>best_loss_so_far:
-        best_loss_so_far=float(auc.mean());
+    if float(cepre.mean())<best_loss_so_far:
+        best_loss_so_far=float(cepre.mean());
         torch.save(ensemble,session.file('model.pt'))
-        
+    
     session.log('AUC: %f + %f, CE: %f + %f, CEpre: %f + %f (%s (%d,%d,%d), epochs %d, batch %d, lr %f, decay %f)'%(auc.mean(),2*auc.std(),ce.mean(),2*ce.std(),cepre.mean(),2*cepre.std(),arch,nlayers,nlayers2,nh,epochs,batch,lr,decay));
     
-    goal=-float(auc.mean()-2*auc.std());
+    #goal=-float(auc.mean());#-2*auc.std()
+    goal=float(ce.mean());
     
     for k in results_by_key:
         auc=torch.Tensor(results_by_key[k]['auc']);

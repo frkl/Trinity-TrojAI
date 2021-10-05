@@ -37,6 +37,20 @@ class Table:
         
         return Table(d);
     
+    def from_csv_file(fname):
+        import csv
+        with open(fname) as f:
+            reader=csv.reader(f);
+            keys=None;
+            data=[];
+            for i,row in enumerate(reader):
+                if i==0:
+                    keys=row;
+                else:
+                    data.append(dict(zip(keys,row)));
+        
+        return Table.from_rows(data);
+    
     def sort_by(self,k,reverse=False):
         data=self.d[k];
         #Get sort index

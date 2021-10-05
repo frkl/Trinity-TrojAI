@@ -1,19 +1,25 @@
 Bootstrap: docker
-From: pytorch/pytorch:1.6.0-cuda10.1-cudnn7-runtime
+From: pytorch/pytorch:1.8.0-cuda11.1-cudnn8-runtime
 
 %files
     ./real_trojan_detector.py /
     ./arch /
     ./util /
-    ./session_0000410 /
-    ./extract_fv_v17r.py /
-    ./extract_fv_color_v2r.py /
-    ./extract_fv_color_v2xy.py /
-    ./demo.py /
+    ./session_0000152 /
+    ./known_trigger_cls.pkl /
+    ./triggers.pt /
+    ./linear_512_800.pt /
+    ./linear_512_200_v2.pt /
+    ./*.py /
+	./*.json /
+    ./utils_qa.py /
 
 %post
-    /opt/conda/bin/conda install scikit-image
-    /opt/conda/bin/conda install scikit-learn
+    /opt/conda/bin/pip install jsonpickle
+    /opt/conda/bin/pip install transformers
+    /opt/conda/bin/pip install datasets
+    /opt/conda/bin/pip install scikit-learn
+    /opt/conda/bin/pip install scikit-image jsonpickle
 
 %runscript
-    exec python3 /real_trojan_detector.py "$@"
+    exec /opt/conda/bin/python3.8 /real_trojan_detector.py "$@"

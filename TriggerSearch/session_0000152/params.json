@@ -1,0 +1,1 @@
+{"nsplits": 8, "pct": 0.5, "arch": "arch.mlp_known_v5s", "data": "data_r8_surrogate7_linear_512_200_gen2_simplified.pt", "session_dir": null, "budget": 10000, "argv": ["crossval_hyper.py", "--arch", "arch.mlp_known_v5s", "--data", "data_r8_surrogate7_linear_512_200_gen2_simplified.pt"]}
