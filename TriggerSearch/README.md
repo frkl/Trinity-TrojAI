@@ -1,6 +1,6 @@
 ## Prerequisite
 
-Put TrojAI round 8 models into data/round8-train-dataset/models. METADATA.csv at data/round8-train-dataset/METADATA.csv.
+Extract TrojAI round 8 models into `data/round8-train-dataset/models`. METADATA.csv at `data/round8-train-dataset/METADATA.csv`.
 
 Follow https://github.com/usnistgov/trojai-example to setup your TrojAI round 8 conda virtual environment.
 
@@ -12,7 +12,7 @@ Follow https://github.com/usnistgov/trojai-example to setup your TrojAI round 8 
 
 This process takes ~4 weeks on a single GPU. To shorten the wait time, edit the model id range in `python data_meta_r8_sel2.py` manually and run different models on different GPUs.
 
-A pre-extracted `meta-r8-sel2/` dataset is hosted at  
+A pre-extracted `meta-r8-sel2/` dataset is hosted at https://www.dropbox.com/s/650taoo7l3gqsc9/meta-r8-sel2.zip?dl=0 .
 
 ### Meta-learning the surrogate model
 
@@ -43,3 +43,4 @@ After feature extraction, use `python crossval_hyper.py --data data_r8_surrogate
 `real_trojan_detector.def` was the singularity container definition file for our latest submission, which achieved CE 0.5749 and ROC-AUC 0.7593 on the round 8 leaderboard. 
 
 `build.sh` has a testing script for building and testing the singularity container.
+
