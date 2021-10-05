@@ -54,7 +54,7 @@ After feature extraction, use `python crossval_hyper.py --data data_r8_surrogate
 
 ### References
 
-If you use our dataset as part of published research, please cite:
+If you use our code as part of published research, please cite:
 
 ```
 @misc{Lin2021,
